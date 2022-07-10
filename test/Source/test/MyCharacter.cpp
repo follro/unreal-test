@@ -7,7 +7,11 @@
 #include "Components/CapsuleComponent.h"
 #include "MyAnimInstance.h"
 #include "DrawDebugHelpers.h"
+#include "MyStatComponent.h"
 #include "MyWeapon.h"
+#include "MyStatComponent.h"
+#include "Components/WidgetComponent.h"
+#include "MyCharacterWidget.h"
 
 // Sets default values
 AMyCharacter::AMyCharacter()
@@ -33,20 +37,19 @@ AMyCharacter::AMyCharacter()
 		GetMesh()->SetSkeletalMesh(SM.Object);
 	}
 
-	/*FName WeaponSocket(TEXT("hand_l_socket"));
-	if(GetMesh()->DoesSocketExist(WeaponSocket))
+	Stat = CreateDefaultSubobject<UMyStatComponent>(TEXT("STAT"));//스탯을 캐릭터에 붙여주는 과정
+
+	HpBar = CreateDefaultSubobject<UWidgetComponent>(TEXT("HPBAR"));//위젯을 캐릭터에 붙여주는 과정
+	HpBar->SetupAttachment(GetMesh());
+	HpBar->SetRelativeLocation(FVector(0.f, 0.f, 200.f));
+	HpBar->SetWidgetSpace(EWidgetSpace::Screen);
+
+	static ConstructorHelpers::FClassFinder<UUserWidget> UW(TEXT("WidgetBlueprint'/Game/UI/WBP_HpBar.WBP_HpBar_C'"));
+	if(UW.Succeeded())
 	{
-		Weapon = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WEAPON"));
-
-		static ConstructorHelpers::FObjectFinder<UStaticMesh> SW(TEXT("StaticMesh'/Game/ParagonShinbi/FX/Meshes/Hero_Specific/SM_Shinbi_Sword_Surround.SM_Shinbi_Sword_Surround'"));
-		if(SW.Succeeded())
-		{
-			Weapon->SetStaticMesh((SW.Object));
-
-		}
-
-		Weapon->SetupAttachment(GetMesh(), WeaponSocket);
-	}*/
+		HpBar->SetWidgetClass(UW.Class);
+		HpBar->SetDrawSize(FVector2D(200.f, 50.f));
+	}
 }
 
 void AMyCharacter::PostInitializeComponents()
@@ -59,6 +62,16 @@ void AMyCharacter::PostInitializeComponents()
 		AnimInstance->OnMontageEnded.AddDynamic(this, &AMyCharacter::OnAttackMontageEnded);
 		AnimInstance->OnAttackHit.AddUObject(this, &AMyCharacter::AttackCheck);
 	}
+
+	HpBar->InitWidget();
+
+	//ToDo hp관련 바인딩 초기화가 모두 마무리가 되면 해야하는 바인딩들
+	//타입을 지정하지 않은 HpBar을 UMyCharacterWidget으로 형변환
+	auto HpWidget = Cast<UMyCharacterWidget>(HpBar->GetUserWidgetObject());
+	if (HpWidget)
+		HpWidget->BindHp(Stat);
+
+
 }
 
 
@@ -178,14 +191,24 @@ void AMyCharacter::AttackCheck()
 	if(bResult && HitResult.Actor.IsValid())
 	{
 		UE_LOG(LogTemp, Log, TEXT("HIt Actor : %s"), *HitResult.Actor->GetName());
+
+		FDamageEvent DamageEvent;
+		HitResult.Actor->TakeDamage(Stat->GetAttack(), DamageEvent,GetController(), this );
+
 	}
 }
 
 
 void AMyCharacter::OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted)
-{
-
+{;
 	IsAttacking = false;
 
 }
 
+//내가 공격을 받으면
+float AMyCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+	Stat->OnAttacked(DamageAmount);
+
+	return DamageAmount;
+}
