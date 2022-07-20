@@ -26,4 +26,11 @@ private:
 
 private:
 	FTimerHandle Timerhandle;//GetTimerManager().SetTimer에서 요구하는 핸들, 타이머 핸들을 통해 예약한것을 취소하고 싶을때.
+
+	UPROPERTY()
+	class UBehaviorTree* BehaviorTree;
+
+	UPROPERTY()
+	class UBlackboardData* BlackboardData;
+
 };
